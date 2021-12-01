@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: pega-web
+  namespace: mypega
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    ingress.kubernetes.io/ssl-redirect: "true"
+    traefik.ingress.kubernetes.io/redirect-entry-point: "https"
+    traefik.ingress.kubernetes.io/redirect-permanent: "true"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt"
+spec:
+  tls:
+   - hosts:
+     - "${HOSTNAME}.${AZURE_REGION}.cloudapp.azure.com" // change this line
+     secretName: "${HOSTNAME}.${AZURE_REGION}.cloudapp.azure.com" // change this line
+  backend:
+    serviceName: pega-web
+    servicePort: 80
+  rules:
+  - host: "${HOSTNAME}.${AZURE_REGION}.cloudapp.azure.com" // change this line
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: pega-web
+          servicePort: 80

@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: load-generator
+  name: load-generator
+  namespace: load-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load-generator
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: load-generator
+    spec:
+      nodeSelector:
+        agentpool: loadtest
+      containers:
+      - command:
+        - /bin/bash
+        - -c
+        - wget https://hey-release.s3.us-east-2.amazonaws.com/hey_linux_amd64;\
+          ./hey -z 5m -c 100 -q 200  http://pega-web.mypega.svc.cluster.local/
+        image: nginx
+        name: hey
+        resources: {}

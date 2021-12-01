@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: load-generator
+  name: load-generator
+  namespace: load-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load-generator
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: load-generator
+    spec:
+      nodeSelector:
+        agentpool: loadtest
+      containers:
+      - command:
+        - /bin/sh
+        - -c
+        - while sleep 0.01; do wget -q -O- http://pega-web.mypega.svc.cluster.local; done
+        image: busybox
+        name: busybox
+        resources: {}
+status: {}

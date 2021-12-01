@@ -1,0 +1,10 @@
+apiVersion: v1
+description: Pega Search installation on kubernetes
+home: http://www.pega.com
+keywords:
+- pega
+- prpc
+- kubernetes
+- search
+name: pegasearch
+version: 1.2.0

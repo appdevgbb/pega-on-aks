@@ -1,0 +1,68 @@
+```plantumlcode
+@startuml
+footer Pega on Azure Kubernetes Service
+scale max 1024 width
+
+skinparam nodesep 10
+skinparam ranksep 10
+
+' Azure
+!define AzurePuml https://raw.githubusercontent.com/RicardoNiepel/Azure-PlantUML/release/2-1/dist
+
+!includeurl AzurePuml/AzureCommon.puml
+!includeurl AzurePuml/AzureSimplified.puml
+
+!includeurl AzurePuml/Containers/AzureContainerRegistry.puml
+!includeurl AzurePuml/Databases/AzureSqlDatabase.puml
+
+' Kubernetes
+!define KubernetesPuml https://raw.githubusercontent.com/dcasati/kubernetes-PlantUML/master/dist
+
+!includeurl KubernetesPuml/kubernetes_Common.puml
+!includeurl KubernetesPuml/kubernetes_Context.puml
+!includeurl KubernetesPuml/kubernetes_Simplified.puml
+
+!includeurl KubernetesPuml/OSS/KubernetesIng.puml
+!includeurl KubernetesPuml/OSS/KubernetesPod.puml
+!includeurl KubernetesPuml/OSS/KubernetesSts.puml
+
+actor "User" as userAlias
+
+left to right direction
+
+' Azure Components
+AzureContainerRegistry(acr, "ACR", "Canada Central")
+AzureSqlDatabase(sql, "\nAzure\nSQL", "Canada Central")
+
+' Kubernetes Components
+Cluster_Boundary(cluster, "Kubernetes Cluster") {
+    Namespace_Boundary(nsIng, "ingress-traefik") {
+        KubernetesIng(ingress, "Traefik", "")
+    }
+
+    Namespace_Boundary(nsPega, "mypega") {
+        KubernetesPod(pegaWeb1, "pega-web", "port 8080")
+        KubernetesPod(pegaWeb2, "pega-web", "port 8080")
+        KubernetesSts(pegaBatch, "pega-batch", "")
+        KubernetesSts(pegaStream, "pega-stream", "")
+    }
+}
+
+
+Rel(userAlias, ingress, "HTTPS", "")
+
+Rel(ingress, pegaWeb1, " ")
+Rel(ingress, pegaWeb2, " ")
+
+Rel(pegaWeb1, pegaStream, " ")
+Rel(pegaWeb2, pegaStream, " ")
+
+Rel(pegaWeb1, pegaBatch, " ")
+Rel(pegaWeb2, pegaBatch, " ")
+
+Rel(pegaStream, sql, " ")
+Rel(pegaWeb1, sql, " ")
+Rel(pegaWeb2, sql, " ")
+
+@enduml
+```

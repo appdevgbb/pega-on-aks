@@ -1,0 +1,293 @@
+---
+global:
+  # This values.yaml file is an example.  For more information about
+  # each configuration option, see the project readme.
+  # https://github.com/pegasystems/pega-helm-charts/tree/master/charts/pega#pega-helm-chart
+  # Enter your Kubernetes provider.
+  provider: "k8s"
+
+  # Deploy Pega nodes
+  actions:
+    execute: "deploy"
+    # execute: "install-deploy"
+
+  # Provide JDBC connection information to the Pega relational database
+  #   If you are installing or upgrading on IBM DB2, update the udb.conf file in the /charts/pega/charts/installer/config/udb directory with any additional connection properties.
+  jdbc:
+    # SQL Server jdbc:sqlserver://localhost:1433;databaseName=dbName;selectMethod=cursor;sendStringParametersAsUnicode=false
+    # 
+    # PARAMETERS NEEDED:
+    #
+    # PEGA_DB_SERVER
+    # PEGA_DB
+    # PEGA_ADMIN_USER
+    # PEGA_ADMIN_PASSWORD
+    # AZURE_CONTAINER_REGISTRY_NAME
+    # AZURE_CONTAINER_REGISTRY_USERNAME
+    # AZURE_CONTAINER_REGISTRY_PASSWORD
+    # SQL_USERNAME
+    # SQL_PASSWORD
+    # BLOBSTORAGE
+    # INGRESS_DOMAIN_NAME
+    # PEGA_UI_PASSWORD
+    #
+    url: "jdbc:sqlserver://${PEGA_DB_SERVER}.database,windows.net:1433;database=${PEGA_DB};selectMethod=direct;responseBuffering=full;sendStringParametersAsUnicode=false;user=${PEGA_ADMIN}@${PEGA_DB_SERVER};password=${PEGA_ADMIN_PASSOWORD};encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;"
+    #   driverClass 	-- jdbc class.  Valid values are:
+    #
+    #   Oracle              oracle.jdbc.OracleDriver
+    #   IBM DB/2            com.ibm.db2.jcc.DB2Driver
+    #   SQL Server          com.microsoft.sqlserver.jdbc.SQLServerDriver
+    #   PostgreSQL          org.postgresql.Driver
+    driverClass: "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+    #   pega.database.type	Valid values are: mssql, oracledate, udb, db2zos, postgres
+    dbType: "mssql"
+    #   For databases that use multiple JDBC driver files (such as DB2), specify comma separated values for 'driverUri'
+    #
+    #   Download the jdbc driver from a blob storage closer to the Kubernetes nodes
+    #   the original driver can be found here: 
+    #     https://repo1.maven.org/maven2/com/microsoft/sqlserver/mssql-jdbc/8.2.0.jre11/mssql-jdbc-8.2.0.jre11.jar
+    driverUri: "https://${BLOBSTORAGE}.blob.core.windows.net/jdbc-driver/mssql-jdbc-8.2.0.jre11.jar"
+    username: "${SQL_USERNAME}"
+    password: "${SQL_PASSWORD}"
+    # CUSTOM CONNECTION PROPERTIES
+    # Add a list of ; delimited connections properties. The list must end with ;
+    # For example: connectionProperties=user=usr;password=pwd;
+    connectionProperties: "connectionProperties=user=${SQL_USERNAME};password=${SQL_PASSWORD}"
+    rulesSchema: "RULES"
+    dataSchema: "DATA"
+    customerDataSchema: "CustomerData"
+
+  # If using a custom Docker registry, supply the credentials here to pull Docker images.
+  docker:
+    registry:
+      url: "${AZURE_CONTAINER_REGISTRY_NAME}.azurecr.io"
+      username: "${AZURE_CONTAINER_REGISTRY_USERNAME}"
+      password: "${AZURE_CONTAINER_REGISTRY_PASSWORD}"
+      # Docker image information for the Pega docker image, containing the application server.
+    pega:
+      image: "${AZURE_CONTAINER_REGISTRY_NAME}.azurecr.io/pega/pega:8.5.1"
+
+  # Upgrade specific properties
+  upgrade:
+    # Configure only for aks/pks
+    # Run "kubectl cluster-info" command to get the service host and https service port of kubernetes api server.
+    # Example - Kubernetes master is running at https://<service_host>:<https_service_port>
+    kube-apiserver:
+      serviceHost: ""
+      httpsServicePort: ""
+
+  # Specify the Pega tiers to deploy
+  tier:
+    - name: "web"
+      livenessProbe:
+        initialDelaySeconds: 400
+        failureThreshold: 30
+      readinessProbe:
+        initialDelaySeconds: 30 
+        failureThreshold: 30
+      # Create a an interactive tier for web users.  This tier uses
+      # the WebUser node type and will be exposed via a service to
+      # the load balancer.
+      nodeType: "WebUser"
+
+      # Pega requestor specific properties
+      requestor:
+        # Inactivity time after which requestor is passivated
+        passivationTimeSec: 900
+
+      service:
+        # For help configuring the service block, see the Helm chart documentation
+        # https://github.com/pegasystems/pega-helm-charts/blob/master/charts/pega/README.md#service
+        port: 80
+        targetPort: 8080
+
+      ingress:
+        # For help configuring the ingress block including TLS, see the Helm chart documentation
+        # https://github.com/pegasystems/pega-helm-charts/blob/master/charts/pega/README.md#ingress
+
+        # Enter the domain name to access web nodes via a load balancer.
+        #  e.g. web.mypega.example.com
+        domain: "${INGRESS_DOMAIN_NAME}.eastus.cloudapp.azure.com"
+        tls:
+          # Enable TLS encryption
+          enabled: true
+          secretName: ${INGRESS_DOMAIN_NAME}.eastus.cloudapp.azure.com
+          # useManagedCertificate: false
+          ssl_annotation:
+            kubernetes.io/ingress.class: "traefik"
+            ingress.kubernetes.io/protocol: "https"
+            ingress.kubernetes.io/auth-tls-insecure: "true"
+            cert-manager.io/cluster-issuer: "letsencrypt"
+
+      replicas: 1
+      javaOpts: ""
+      pegaDiagnosticUser: ""
+      pegaDiagnosticPassword: ""
+
+      deploymentStrategy:
+        rollingUpdate:
+          maxSurge: 25%
+          maxUnavailable: 25%
+        type: RollingUpdate
+
+      # Optionally overridde default resource specifications
+      cpuRequest: 1
+      memRequest: "6Gi"
+      cpuLimit: 2
+      memLimit: "8Gi"
+      initialHeap: "4096m"
+      maxHeap: "7168m"
+
+      # To configure an alternative user for custom image, set value for runAsUser.
+      # See, https://github.com/pegasystems/pega-helm-charts/blob/master/charts/pega/README.md#security-context
+      # securityContext:
+      #   runAsUser: 9001
+
+      hpa:
+        enabled: true
+        hpa.minReplicas: 1
+        hpa.maxReplicas: 4
+        hpa.targetAverageCPUUtilization: 40
+        hpa.enableCpuTarget: true
+
+    - name: "batch"
+      livenessProbe:
+        initialDelaySeconds: 400
+      readinessProbe:
+        initialDelaySeconds: 30
+        failureThreshold: 30
+      # Create a background tier for batch processing.  This tier uses
+      # a collection of background node types and will not be exposed to
+      # the load balancer.
+      nodeType: "BackgroundProcessing,Search,BIX"
+
+      replicas: 1
+      javaOpts: ""
+
+      pegaDiagnosticUser: ""
+      pegaDiagnosticPassword: ""
+
+      deploymentStrategy:
+        rollingUpdate:
+          maxSurge: 25%
+          maxUnavailable: 25%
+        type: RollingUpdate
+
+      # To configure an alternative user for your custom image, set value for runAsUser
+      # See, https://github.com/pegasystems/pega-helm-charts/blob/master/charts/pega/README.md#security-context
+      # securityContext:
+      #   runAsUser: 9001
+
+      hpa:
+        enabled: false
+        enableMemoryTarget: false
+
+    - name: "stream"
+      livenessProbe:
+        initialDelaySeconds: 130
+        failureThreshold: 30
+      readinessProbe:
+        initialDelaySeconds: 30
+        failureThreshold: 30
+      # Create a stream tier for queue processing.  This tier deploys
+      # as a stateful set to ensure durability of queued data. It may
+      # be optionally exposed to the load balancer.
+      nodeType: "Stream"
+
+      # Pega requestor specific properties
+      requestor:
+        # Inactivity time after which requestor is passivated
+        passivationTimeSec: 900
+
+      service:
+        port: 7003
+        targetPort: 7003
+
+      # If a nodeSelector is required for this or any tier, it may be specified here:
+      # nodeSelector:
+      #  disktype: ssd
+
+      ingress:
+        # Enter the domain name to access web nodes via a load balancer.
+        #  e.g. web.mypega.example.com
+        domain: "${INGRESS_DOMAIN_NAME}.eastus.cloudapp.azure.com"
+        tls:
+          # Enable TLS encryption
+          enabled: true
+          secretName: ${INGRESS_DOMAIN_NAME}.cloudapp.azure.com
+          # useManagedCertificate: false
+          ssl_annotation:
+            kubernetes.io/ingress.class: "traefik"
+            ingress.kubernetes.io/protocol: "https"
+            ingress.kubernetes.io/auth-tls-insecure: "true"
+            cert-manager.io/cluster-issuer: "letsencrypt"
+
+      # To configure an alternative user for your custom image, set value for runAsUser
+      # See, https://github.com/pegasystems/pega-helm-charts/blob/master/charts/pega/README.md#security-context
+      # securityContext:
+      #   runAsUser: 9001
+
+      replicas: 1
+
+      volumeClaimTemplate:
+        resources:
+          requests:
+            storage: 10Gi
+
+# External services
+
+# Cassandra automatic deployment settings.
+cassandra:
+  enabled: false
+  persistence:
+    enabled: true
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: 2
+    limits:
+      memory: "8Gi"
+      cpu: 4
+
+# DDS (external Cassandra) connection settings.
+# These settings should only be modified if you are using a custom Cassandra deployment.
+dds:
+  externalNodes: ""
+  port: "9042"
+  username: "dnode_ext"
+  password: "dnode_ext"
+
+# Elasticsearch deployment settings.
+# Note: This Elasticsearch deployment is used for Pega search, and is not the same Elasticsearch deployment used by the EFK stack.
+# These search nodes will be deployed regardless of the Elasticsearch configuration above.
+# Refer to README document to configure `Search and Reporting Service` as a search functionality provider under this section.
+pegasearch:
+  image: "${AZURE_CONTAINER_REGISTRY_NAME}.azurecr.io/pega/search:8.5.1"
+  memLimit: "3Gi"
+  replicas: 1
+
+# Pega Installer settings.
+installer:
+  image: "${AZURE_CONTAINER_REGISTRY_NAME}.azurecr.io/pega/installer:8.5.1"
+  # Set the initial administrator@pega.com password for your installation.  This will need to be changed at first login.
+  # The adminPassword value cannot start with "@".
+  adminPassword: "${PEGA_UI_PASSWORD}"
+  # Upgrade specific properties
+  upgrade:
+    # Type of upgrade
+    # Valid values are 'in-place' , 'out-of-place'
+    upgradeType: "in-place"
+    # Specify target rules schema for migration and upgrade
+    targetRulesSchema: ""
+
+# Hazelcast settings (applicable from Pega 8.6)
+hazelcast:
+  image: "YOUR_HAZELCAST_IMAGE:TAG"
+  # Setting below to true will deploy the infinity in client server hazelcast mode
+  enabled: false
+  # No. of initial members to join
+  replicas: 3
+  # UserName to be used in client server hazelcast mode for authentication
+  username: ""
+  # Password to be used in client server hazelcast mode for authentication
+  password: ""
